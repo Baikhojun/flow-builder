@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!-- 이 파일의 역할: FlowBuilder 메인 진입점 (구조만 정의, 로직은 js/*.js) -->
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowBuilder — 업무 흐름도를 Mermaid 코드로</title>
+  <meta name="description" content="도형과 화살표로 업무 흐름을 그리면 Mermaid 코드가 자동 생성됩니다." />
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="flow-builder">
+  <!-- 시작 화면 (오버레이) -->
+  <div id="start-screen" class="overlay">
+    <div class="start-card">
+      <img src="assets/favicon.ico" alt="로고" class="start-logo" />
+      <h1>FlowBuilder</h1>
+      <p class="subtitle">"내 업무 흐름"을 도형으로 → Mermaid 코드 자동 생성</p>
+      <p class="tagline">종이·펜 없이 디지털로. 완성하면 mermaid.live에 1초 만에 옮길 수 있어요.</p>
+      <p class="tagline" style="font-size:0.85em;opacity:0.85;margin-top:-0.3em;color:#7c3aed;">💡 외울 필요 없어요 — 5~8개 도형이면 충분합니다</p>
+      <p class="tagline" style="font-size:0.85em;opacity:0.75;margin-top:-0.4em;">📘 유신 AI 2차 TF · 2회차 2교시 (Draw Toast 다음 단계)</p>
+      <label class="nickname-label">
+        <span>닉네임</span>
+        <input type="text" id="nickname-input" placeholder="예: 회계_백호준" maxlength="16" />
+      </label>
+      <label class="timer-label">
+        <span>타이머</span>
+        <select id="timer-select">
+          <option value="0">없음</option>
+          <option value="300">5분</option>
+          <option value="600">10분</option>
+          <option value="1200" selected>20분 (2회차 권장)</option>
+        </select>
+      </label>
+      <button id="start-btn" class="primary-btn">시작하기 →</button>
+      <button id="help-btn-start" class="link-btn">❓ 이 게임이 뭐예요?</button>
+      <p class="footer-credit">based on Draw Toast (WhiteJune) · FlowBuilder by 정보시스템실</p>
+    </div>
+  </div>
+
+  <!-- 메인 게임 화면 -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <img src="assets/favicon.ico" alt="로고" class="topbar-logo" />
+      <span class="logo">FlowBuilder</span>
+      <span class="player-name" id="player-name-display" title="클릭하면 이름을 바꿀 수 있어요"></span>
+    </div>
+    <div class="topbar-center">
+      <button id="connect-mode-btn" class="mode-btn">🔗 연결모드</button>
+      <button id="clear-btn" class="ghost-btn">🗑 캔버스 비우기</button>
+      <button id="help-btn-top" class="ghost-btn">❓ 도움말</button>
+    </div>
+    <div class="topbar-right">
+      <button id="finish-btn" class="primary-btn">✅ 완성!</button>
+    </div>
+  </header>
+
+  <main class="layout layout-fb">
+    <!-- 좌측: 도형 팔레트 + 부서별 빠른 라벨 -->
+    <aside class="palette" aria-label="도형 팔레트">
+      <div class="palette-section">
+        <h4 class="palette-section-title">🔷 도형 4종</h4>
+        <div class="shape-grid" id="shape-grid"></div>
+        <p class="palette-hint shape-hint">도형 클릭 → 캔버스에 추가<br>도형 더블클릭 → 텍스트 입력</p>
+      </div>
+      <div class="palette-section">
+        <h4 class="palette-section-title">⚡ 빠른 라벨 (부서별)</h4>
+        <div class="palette-tabs" id="palette-tabs"></div>
+        <div class="palette-grid quick-grid" id="palette-grid"></div>
+        <p class="palette-hint">라벨 클릭 → 자동으로 적절한 도형 + 텍스트 추가</p>
+      </div>
+    </aside>
+
+    <!-- 중앙: 캔버스 -->
+    <section class="canvas-wrap" aria-label="작업 캔버스">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#475569" />
+          </marker>
+        </defs>
+        <g id="arrows-layer"></g>
+        <g id="cards-layer"></g>
+      </svg>
+      <div class="canvas-empty-hint" id="canvas-empty-hint">
+        <p>👈 왼쪽 팔레트에서 도형을 클릭해 시작하세요</p>
+        <p class="small">두 도형을 화살표로 연결하려면 위쪽 <b>🔗 연결모드</b>를 켜세요.</p>
+        <p class="small">→ 우측 패널에 <b>Mermaid 코드</b>가 실시간으로 생성됩니다.</p>
+      </div>
+    </section>
+
+    <!-- 우측: Mermaid 코드 패널 + 액션 -->
+    <aside class="sidebar sidebar-fb" aria-label="Mermaid 코드">
+      <div class="sidebar-block timer-block">
+        <h3>⏱ 타이머 · 진행</h3>
+        <div id="timer-display" class="timer-display">--:--</div>
+        <p class="stat-line">도형 <b id="stat-shapes">0</b>개 · 연결 <b id="stat-arrows">0</b>개</p>
+      </div>
+
+      <div class="sidebar-block code-block">
+        <h3>📝 Mermaid 코드 <span class="live-dot">●</span></h3>
+        <pre id="mermaid-code" class="mermaid-code">flowchart TD
+    A["도형을 추가하면 여기에 코드가 생성됩니다"]</pre>
+      </div>
+
+      <div class="sidebar-block">
+        <h3>🎯 액션</h3>
+        <button id="copy-code-btn" class="primary-btn full">📋 Mermaid 코드 복사</button>
+        <button id="open-live-btn" class="ghost-btn full">🌐 mermaid.live 열기</button>
+        <button id="save-md-btn" class="ghost-btn full">💾 .md 파일 저장</button>
+        <button id="save-png-btn" class="ghost-btn full">🖼 PNG 다운로드</button>
+        <button id="gallery-btn" class="ghost-btn full">🖼 갤러리 (<span id="gallery-count">0</span>)</button>
+      </div>
+
+      <div class="sidebar-block credit-block">
+        <p class="credit-text">기반: Draw Toast (WhiteJune) · 확장: 정보시스템실</p>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 완성 모달 -->
+  <div id="finish-modal" class="overlay hidden">
+    <div class="modal-card finish-card">
+      <h2>🎉 흐름도 완성!</h2>
+      <p id="finish-message">멋진 흐름도가 완성됐어요.</p>
+
+      <!-- 결과지 해석 -->
+      <div id="finish-interpretation" class="interpretation"></div>
+
+      <!-- Mermaid 코드 미리보기 -->
+      <div class="finish-code-preview">
+        <h4>📝 자동 생성된 Mermaid 코드</h4>
+        <pre id="finish-mermaid-code" class="mermaid-code"></pre>
+      </div>
+
+      <div class="modal-actions">
+        <button id="finish-copy" class="primary-btn">📋 코드 복사</button>
+        <button id="finish-live" class="primary-btn">🌐 mermaid.live 열기</button>
+        <button id="finish-download" class="ghost-btn">💾 .md 받기</button>
+        <button id="finish-continue" class="ghost-btn">계속 수정</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 도움말 모달 -->
+  <div id="help-modal" class="overlay hidden">
+    <div class="modal-card help-card">
+      <header class="help-header">
+        <h2>❓ FlowBuilder가 뭐예요?</h2>
+        <button id="help-close" class="ghost-btn">닫기</button>
+      </header>
+
+      <section class="help-section">
+        <h3>🎯 한 줄로 말하면</h3>
+        <p class="help-lead">"종이에 그릴 흐름도를 디지털로 그리고, <b>Mermaid 코드를 자동 생성</b>해주는 도구"</p>
+      </section>
+
+      <section class="help-section">
+        <h3>🔷 도형 4종</h3>
+        <ul class="help-list">
+          <li><b>▭ 과정</b> — 일반 작업·처리 (가장 많이 씁니다)</li>
+          <li><b>▢ 시작/끝</b> — 흐름의 시작·종료·문서</li>
+          <li><b>◇ 판단</b> — "예/아니오" 분기 (조건문)</li>
+          <li><b>⬭ 데이터</b> — 결과물·산출물·파일</li>
+        </ul>
+      </section>
+
+      <section class="help-section">
+        <h3>📝 어떻게 하나요? (10~15분)</h3>
+        <ol class="help-list">
+          <li>닉네임 쓰고 <b>시작</b> 누르기</li>
+          <li>왼쪽 도형 4종 중 하나 클릭 → 캔버스에 추가</li>
+          <li>도형을 <b>더블클릭</b>해서 텍스트 입력</li>
+          <li>또는 <b>부서별 빠른 라벨</b>에서 1클릭으로 도형+텍스트 추가</li>
+          <li>도형을 마우스로 끌어서 위치 조정</li>
+          <li>위쪽 <b>🔗 연결모드</b> ON → 도형 A 클릭 → 도형 B 클릭 → 화살표 자동</li>
+          <li>화살표 더블클릭 → "예/아니오" 같은 라벨 추가 (선택)</li>
+          <li>우측 <b>Mermaid 코드</b>가 실시간으로 생성됨 → 📋 복사 → 🌐 mermaid.live 붙여넣기</li>
+        </ol>
+      </section>
+
+      <section class="help-section">
+        <h3>🚀 가장 빠른 사용법</h3>
+        <ol class="help-list">
+          <li>본인 부서 탭 (예: 🏢 회계부) 클릭</li>
+          <li>위에서부터 라벨 1클릭씩 → 7개 도형이 자동으로 캔버스에 깔림</li>
+          <li>드래그로 위치 조정 + 화살표 연결</li>
+          <li>📋 코드 복사 → mermaid.live 붙여넣기 → 끝</li>
+        </ol>
+        <p class="help-note">💡 외울 필요 없어요. <b>5~8개 도형이면 충분</b>합니다.</p>
+      </section>
+
+      <div class="modal-actions">
+        <button id="help-close-2" class="primary-btn">알았어요!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 갤러리 모달 -->
+  <div id="gallery-modal" class="overlay hidden">
+    <div class="modal-card gallery-card">
+      <header class="gallery-header">
+        <h2>🖼 갤러리 — 다양한 업무 흐름도</h2>
+        <button id="gallery-close" class="ghost-btn">닫기</button>
+      </header>
+      <div class="gallery-controls">
+        <button id="gallery-mode-grid" class="ghost-btn active">격자 보기</button>
+        <button id="gallery-mode-compare" class="ghost-btn">두 작품 비교</button>
+        <button id="gallery-clear" class="ghost-btn danger">⚠ 전체 삭제</button>
+      </div>
+      <div id="gallery-content" class="gallery-content"></div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 -->
+  <div id="toast-notification" class="toast hidden"></div>
+
+  <!-- 스크립트 (의존 순서) -->
+  <script src="js/shapes-data.js"></script>
+  <script src="js/palette.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/arrows.js"></script>
+  <script src="js/labels.js"></script>
+  <script src="js/timer.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/gallery.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/mermaid-export.js"></script>
+  <script src="js/interpret.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
