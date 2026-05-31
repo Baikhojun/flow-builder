@@ -69,8 +69,11 @@
   }
 
   function init() {
-    document.getElementById("timer-toggle").addEventListener("click", toggle);
-    document.getElementById("timer-reset").addEventListener("click", () => reset(false));
+    // FlowBuilder 사이드바는 timer-display만 있고 toggle/reset 버튼은 없음 — null-safe
+    const toggleBtn = document.getElementById("timer-toggle");
+    if (toggleBtn) toggleBtn.addEventListener("click", toggle);
+    const resetBtn = document.getElementById("timer-reset");
+    if (resetBtn) resetBtn.addEventListener("click", () => reset(false));
     render();
   }
 
